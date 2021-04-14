@@ -1,7 +1,3 @@
-/*
- * SegmentTest.java
- */
-
 package ogkg38;
 
 import org.junit.After;
