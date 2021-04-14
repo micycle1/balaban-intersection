@@ -4,7 +4,8 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>micycle</groupId>
 	<artifactId>BalabanAlgorithm</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
+	<description>Balaban's algorithm for line segments intersection</description>
 
 	<dependencies>
 		<dependency>

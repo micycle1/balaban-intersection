@@ -1,53 +1,56 @@
-package ogkg38;
+package micycle.balaban;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
-import java.util.TreeSet;
+import java.util.NavigableSet;
 import java.util.ArrayList;
 
 /**
  *
  * @author taras
  */
-public class SolverBalaban {
+public class BalabanSolver {
 
-	Segments segments;
-	EndPoint[] endPoints;
-	IntersectionListener listener;
+	private EndPoint[] endPoints;
+	private final IntersectionCallback listener;
 
-	public static List<Segment> sort(final double x, List<Segment> s) {
-		Collections.sort(s, new Comparator<Segment>() {
-			@Override
-			public int compare(Segment o1, Segment o2) {
-				double y1 = o1.getY(x), y2 = o2.getY(x);
-				if (y1 == y2) {
-					return 0;
-				}
-				if (y1 < y2) {
-					return -1;
-				} else {
-					return 1;
-				}
-			}
-		});
-		return s;
+	public boolean useOptimization = false;
+	public double coef = 1;
+
+	public BalabanSolver(IntersectionCallback listener) {
+		this.listener = listener;
+	}
+
+	/**
+	 * Computes the self-intersections between
+	 * 
+	 * @param segments
+	 */
+	public void intersectingPairs(Collection<Segment> segments) {
+		endPoints = segmentsToEnds(segments);
+		ArrayList<Segment> Lr = new ArrayList<Segment>();
+		final ArrayList<Segment> Ir = new ArrayList<Segment>();
+		Lr.add(endPoints[0].segment);
+		Ir.addAll(segments);
+		Ir.remove(endPoints[0].segment);
+		Ir.remove(endPoints[endPoints.length - 1].segment);
+		treeSearch(Lr, Ir, 0, endPoints.length - 1);
 	}
 
 	/**
 	 * implementation of procedure Split([1] page 2) O(l.size())
 	 *
-	 * @param b  - begin of strip
-	 * @param e  - ent of strip
-	 * @param l  - ArrayList to split. l is ordered by coordinate y of segments in
+	 * @param b  x position of strip start (inclusive)
+	 * @param e  x position of strip end (inclusive)
+	 * @param l  ArrayList to split. l is ordered by coordinate y of segments in
 	 *           abscisssae b
-	 * @param q  - returned value. q is complete relative to l1
-	 * @param l1 - returned value.
+	 * @param q  returned value. q is complete relative to l1
+	 * @param l1 returned value.
 	 */
-	public static void split(double b, double e, Collection<Segment> l, Collection<Segment> q, Collection<Segment> l1) {
+	private static void split(double b, double e, Collection<Segment> l, Collection<Segment> q,
+			Collection<Segment> l1) {
 		q.clear();
 		Segment lastQ = null;
 		l1.clear();
@@ -71,24 +74,24 @@ public class SolverBalaban {
 	 * that seg has points between i-1 and i-th stairs O(k+1), k is number of
 	 * intersections
 	 *
-	 * @param b
-	 * @param e
+	 * @param b         x position of strip start (inclusive)
+	 * @param e         x position of strip end (inclusive)
 	 * @param staircase
 	 * @param i
 	 * @param seg
 	 */
-	private void findIntersectionSegmentStaircase(double b, double e, TreeSet<Segment> work, int i, Segment seg) {
+	private void findIntersectionSegmentStaircase(double b, double e, NavigableSet<Segment> work, int i, Segment seg) {
 		for (Segment segment : work.tailSet(seg, false)) {
 			if (!segment.isIntersecting(b, e, seg)) {
 				break;
 			}
-			listener.say(segment, seg);
+			listener.intersects(segment, seg);
 		}
 		for (Segment segment : work.headSet(seg, false).descendingSet()) {
 			if (!segment.isIntersecting(b, e, seg)) {
 				break;
 			}
-			listener.say(segment, seg);
+			listener.intersects(segment, seg);
 		}
 
 	}
@@ -98,8 +101,8 @@ public class SolverBalaban {
 	 * that seg has points between i-1 and i-th stairs O(k+1), k is number of
 	 * intersections
 	 *
-	 * @param b
-	 * @param e
+	 * @param b         x position of strip start (inclusive)
+	 * @param e         x position of strip end (inclusive)
 	 * @param staircase
 	 * @param i
 	 * @param seg
@@ -109,13 +112,13 @@ public class SolverBalaban {
 		int h = i;
 		while (h < work.size() && work.get(h).isIntersecting(b, e, seg)) {
 			cnt++;
-			listener.say(work.get(h), seg);
+			listener.intersects(work.get(h), seg);
 			h++;
 		}
 		int l = i - 1;
 		while (l >= 0 && work.get(l).isIntersecting(b, e, seg)) {
 			cnt++;
-			listener.say(work.get(l), seg);
+			listener.intersects(work.get(l), seg);
 			l--;
 		}
 		return cnt;
@@ -124,12 +127,12 @@ public class SolverBalaban {
 	/**
 	 * return point of segment in (b, e). segment must cross (b, e)
 	 *
-	 * @param b
-	 * @param e
+	 * @param b       x position of strip start (inclusive)
+	 * @param e       x position of strip end (inclusive)
 	 * @param segment
 	 * @return
 	 */
-	private double getPoint(double b, double e, Segment segment) {
+	private static double getPoint(double b, double e, Segment segment) {
 		return segment.from.x > b ? segment.from.x : b;
 	}
 
@@ -137,13 +140,13 @@ public class SolverBalaban {
 	 * find number i of stair, where seg has a point between i-1 and i-th stairs of
 	 * staircase(work, (b, e))
 	 *
-	 * @param b
-	 * @param e
+	 * @param b         x position of strip start (inclusive)
+	 * @param e         x position of strip end (inclusive)
 	 * @param staircase
 	 * @param seg
 	 * @return i
 	 */
-	private int loc(double b, double e, List<Segment> staircase, Segment seg) {
+	private static int loc(double b, double e, List<Segment> staircase, Segment seg) {
 		double x = getPoint(b, e, seg);
 		int l = 0, h = staircase.size();
 		while (h != l) {
@@ -165,14 +168,12 @@ public class SolverBalaban {
 	 * @param d segments of strip D
 	 * @param s segments
 	 */
-	public void findIntersectionUnsorted(double b, double e, List<Segment> d, Collection<Segment> s) {
+	private void findIntersectionUnsorted(double b, double e, List<Segment> d, Collection<Segment> s) {
 		for (Segment segment : s) {
 			int i = loc(b, e, d, segment);
 			findIntersectionSegmentStaircase(b, e, d, i, segment);
 		}
 	}
-
-	private static final int METHOD = 1;
 
 	/**
 	 * O(d + s + int(d, s))
@@ -181,8 +182,9 @@ public class SolverBalaban {
 	 * @param e end of strip D=(d, (b,e))
 	 * @param d segments of strip D
 	 * @param s segments, sorted by < in x, x in [b, e]
+	 * @return number of itnersections?
 	 */
-	public int findIntersectionSorted(double b, double e, double x, List<Segment> d, List<Segment> s) {
+	private int findIntersectionSorted(double b, double e, double x, List<Segment> d, List<Segment> s) {
 		if (s.isEmpty()) {
 			return 0;
 		}
@@ -194,9 +196,6 @@ public class SolverBalaban {
 			while (segment.getY(x) >= last.getY(x)) {
 				cnt += findIntersectionSegmentStaircase(b, e, d, i, last);
 				if (!itS.hasNext()) {
-					if (METHOD == 0) {
-						listener.stopUpdate();
-					}
 					return cnt;
 				}
 				last = itS.next();
@@ -218,7 +217,7 @@ public class SolverBalaban {
 	 * @param s2 sorted in point x ArrayList
 	 * @return s1 union s2 in point x ArrayList
 	 */
-	public static List<Segment> merge(double x, List<Segment> s1, List<Segment> s2) {
+	static List<Segment> merge(double x, List<Segment> s1, List<Segment> s2) {
 		if (s1.isEmpty()) {
 			return s2;
 		}
@@ -261,12 +260,12 @@ public class SolverBalaban {
 	}
 
 	/**
-	 * every x from l spans (b, e), without this algorithm hangs up, because
-	 * elements, that doesn't span (e, b) always stay in l1, and l1 never become
-	 * empty works O(n+k), n=l.size, k=count of intersections
+	 * Every intersection from l spans (b, e), without this algorithm hangs up,
+	 * because elements, that doesn't span (e, b) always stay in l1, and l1 never
+	 * become empty works O(n+k), n=l.size, k=count of intersections
 	 *
-	 * @param b begin of strip
-	 * @param e end of strip
+	 * @param b x position of strip start (inclusive)
+	 * @param e x position of strip end (inclusive)
 	 * @param l strip to find intersections, sorted by ordinate in abscissae b
 	 * @return - r resulting right strip
 	 */
@@ -282,17 +281,18 @@ public class SolverBalaban {
 		// so sorted by e. r1 is sorted by e as result of merge(x)
 	}
 
-	public static class EndPoint implements Comparable<EndPoint> {
+	private static class EndPoint implements Comparable<EndPoint> {
+
 		Segment segment;
 		double x;
-
-		public boolean isLeft() {
-			return x == segment.from.x;
-		}
 
 		public EndPoint(Segment segment, Point endPoint) {
 			this.segment = segment;
 			this.x = endPoint.x;
+		}
+
+		public boolean isLeft() {
+			return x == segment.from.x;
 		}
 
 		@Override
@@ -320,29 +320,19 @@ public class SolverBalaban {
 		return ret;
 	}
 
-	/**
-	 *
-	 * @param Lv
-	 * @param Iv
-	 * @param b
-	 * @param e
-	 * @return Rv
-	 */
-	static List<Segment> Rrrs;
-	public boolean makeOptimization = false;
-	double coef = 1;
+	private List<Segment> Rrrs;
 
 	public List<Segment> treeSearch(Collection<Segment> Lv, Collection<Segment> Iv, int b, int e) {
 		double bd = endPoints[b].x, ed = endPoints[e].x;
 		if (e - b == 1) { // 1
 			return searchInStrip(bd, ed, Lv);
 		}
-		List<Segment> Qv = new ArrayList<Segment>(), Lls = new ArrayList<Segment>(),
-				Ils = new ArrayList<Segment>(), Rls, Lrs, Irs = new ArrayList<Segment>(), Rrs;
+		List<Segment> Qv = new ArrayList<Segment>(), Lls = new ArrayList<Segment>(), Ils = new ArrayList<Segment>(),
+				Rls, Lrs, Irs = new ArrayList<Segment>(), Rrs;
 		split(bd, ed, Lv, Qv, Lls); // 2
 		int cnt = findIntersectionSorted(bd, ed, bd, Qv, Lls); // 3
 		findIntersectionUnsorted(bd, ed, Qv, Iv); // 10-11
-		if (makeOptimization && cnt > Lls.size() * 0.6) {
+		if (useOptimization && cnt > Lls.size() * 1) {
 			List<Segment> s = treeSearch(Lls, Iv, b, e);
 			findIntersectionSorted(bd, ed, ed, Qv, Rrrs);
 			return merge(ed, s, Qv);
@@ -367,26 +357,9 @@ public class SolverBalaban {
 		}
 		Rrs = treeSearch(Lrs, Irs, c, e); // 8
 		findIntersectionSorted(bd, ed, ed, Qv, Rrs); // 9 //addFilter
-		if (METHOD == 1) {
-			listener.stopUpdate();
-		}
+
 		Rrrs = Rrs;
 		return merge(ed, Qv, Rrs); // 12
-	}
-
-	public void intersectingPairs(Collection<Segment> segments) {
-		listener.startUpdate();
-		endPoints = segmentsToEnds(segments);
-		ArrayList<Segment> Lr = new ArrayList<Segment>(), Ir = new ArrayList<Segment>();
-		Lr.add(endPoints[0].segment);
-		Ir.addAll(segments);
-		Ir.remove(endPoints[0].segment);
-		Ir.remove(endPoints[endPoints.length - 1].segment);
-		treeSearch(Lr, Ir, 0, endPoints.length - 1);
-	}
-
-	public SolverBalaban(IntersectionListener listener) {
-		this.listener = listener;
 	}
 
 }
