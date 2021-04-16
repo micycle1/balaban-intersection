@@ -4,14 +4,24 @@ package micycle.balaban;
  * A segment is a line between two coordinates.
  * 
  * @author taras
+ * @author Michael Carleton
  */
 public class Segment {
 
-	public final Point from, to;
-	private int bs; // [optional] current value of SBv'(Loc(Dv', s))
-	boolean group = false;
+	/** The left-most point */
+	public final Point from;
+	/** The right-most point */
+	public final Point to;
 
-	public Segment(Point from, Point to) {
+	final double b, k;
+
+	/**
+	 * Creates a segment from two points.
+	 * 
+	 * @param from
+	 * @param to
+	 */
+	public Segment(final Point from, final Point to) {
 		if (from.compareTo(to) > 0) {
 			this.from = to;
 			this.to = from;
@@ -19,39 +29,34 @@ public class Segment {
 			this.from = from;
 			this.to = to;
 		}
+
+		b = (to.x * from.y - from.x * to.y) / (to.x - from.x);
+		k = (to.y - from.y) / (to.x - from.x);
 	}
 
 	/**
-	 * Compute the point of intersection between this and another segment.
+	 * Creates a segment from two points given by their coordinates.
+	 * 
+	 * @param x1 x coordinate of point 1
+	 * @param y1 y coordinate of point 1
+	 * @param x2 x coordinate of point 2
+	 * @param y2 y coordinate of point 2
+	 */
+	public Segment(final double x1, final double y1, final double x2, final double y2) {
+		this(new Point(x1, y1), new Point(x2, y2));
+	}
+
+	/**
+	 * Computes the point of intersection between this segment and another segment.
+	 * This method assumes the segments are intersecting.
 	 * 
 	 * @param s other segment
-	 * @return
+	 * @return point of intersection of the two segments
 	 */
-	public Point getIntersection(Segment s) {
-		double x = getXofIntersection(s);
-		return new Point(x, getY(x));
-	}
-
-	/**
-	 * Computes the x coordinate of the intersection between this segement and the
-	 * given segment. This method assumes the segments are intersecting.
-	 * 
-	 * @param s other intersecting segment
-	 * @return
-	 */
-	public double getXofIntersection(Segment s) {
-		double b = (to.x * from.y - from.x * to.y) / (to.x - from.x), k = (to.y - from.y) / (to.x - from.x);
-		double bs = (s.to.x * s.from.y - s.from.x * s.to.y) / (s.to.x - s.from.x),
-				ks = (s.to.y - s.from.y) / (s.to.x - s.from.x);
-		return (b - bs) / (ks - k);
-	}
-
-	double getY(double x) {
-//		if (x < from.x || x > to.x) {
-//			throw new IllegalArgumentException("x=" + x + " not in segment" + toString());
-//		}
-		double b = (to.x * from.y - from.x * to.y) / (to.x - from.x), k = (to.y - from.y) / (to.x - from.x);
-		return x * k + b;
+	public Point getIntersection(final Segment s) {
+		final double x = (b - s.b) / (s.k - k);
+		final double y = x * k + b;
+		return new Point(x, y);
 	}
 
 	boolean isIntersecting(double b, double e, Segment segment) {
@@ -70,12 +75,16 @@ public class Segment {
 		if (e < b) {
 			return false;
 		}
-		double ybs = segment.getY(b), yb = getY(b), yes = segment.getY(e), ye = getY(e);
+		final double ybs = segment.getY(b), yb = getY(b), yes = segment.getY(e), ye = getY(e);
 		return ybs <= yb && yes >= ye || ybs >= yb && yes <= ye;
 	}
 
 	boolean isSpanning(double b, double e) {
 		return from.x <= b && e <= to.x;
+	}
+
+	double getY(double x) {
+		return x * k + b;
 	}
 
 	@Override
@@ -100,6 +109,6 @@ public class Segment {
 	 */
 	@Override
 	public int hashCode() {
-		return from.hashCode() + to.hashCode(); // may reach int.max on large coord values? Xor instead?
+		return from.hashCode() ^ to.hashCode();
 	}
 }
