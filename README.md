@@ -43,11 +43,11 @@ for (int i = 0; i < 2000; i++) {
 }
 
 Collection<Point> points = new ArrayList<>();
-IntersectionCallback callback = (a, b) -> {
-    // will be called by the solver for each intersecting pair
-	points.add(a.getIntersection(b));
-};
 
-BalabanSolver balabanSolver = new BalabanSolver(callback);
+BalabanSolver balabanSolver = new BalabanSolver((a, b) -> {
+    	// will be called by the solver for each intersecting pair
+	points.add(a.getIntersection(b));
+});
+
 balabanSolver.computeIntersections(segments);
 ```
