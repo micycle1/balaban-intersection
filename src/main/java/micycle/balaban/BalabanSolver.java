@@ -1,19 +1,59 @@
 package micycle.balaban;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.ArrayList;
 
 /**
- * Balaban's Intermediate Algorithm for finding intersecting segment pairs from
- * a given set of N segments in the plane.
- * 
- * @author taras
- * @author Michael Carleton
+ * Balaban's <i>Intermediate Algorithm</i> for efficiently finding intersections
+ * amongst line segments. Specified in "An optimal algorithm for finding
+ * segments intersections" (1995).
+ *
+ * <p>
+ * This algorithm solves the problem of finding all pairs of intersecting line
+ * segments in a collection of segments. It is designed to be efficient, with a
+ * time complexity of O(n log² n + k), where n is the number of segments and k
+ * is the number of intersections.
+ * </p>
+ * <p>
+ * This implementation correctly handles some commonly degenerate cases –
+ * vertical segments and axis-aligned segments that share an endpoint.
+ * <p>
+ * The algorithm works by dividing the plane into vertical strips and processing
+ * segments incrementally within these strips. It uses a divide-and-conquer
+ * approach to recursively split the problem into smaller subproblems, ensuring
+ * that intersections are detected efficiently and without redundant checks.
+ * </p>
+ *
+ * <h2>Key Concepts</h2>
+ * <ul>
+ * <li><b>Vertical Strips</b>: The plane is divided into vertical strips defined
+ * by the x-coordinates of the segment endpoints. Each strip is processed
+ * independently, and intersections are only reported if they lie within the
+ * current strip.</li>
+ * <li><b>Divide and Conquer</b>: The algorithm recursively splits the problem
+ * into smaller subproblems by dividing the segments into left and right subsets
+ * based on their x-coordinates. This ensures that intersections are detected
+ * efficiently.</li>
+ * <li><b>Staircase Structure</b>: Within each strip, segments are organized
+ * into a "staircase" structure, which allows for efficient intersection checks.
+ * The staircase is updated dynamically as segments are added or removed.</li>
+ * </ul>
+ *
+ * <h2>Limitations</h2>
+ * <ul>
+ * <li>The algorithm assumes that no two segments are overlapping (undefined
+ * behaviour).</li>
+ * <li>The algorithm assumes that no more than two segments share an endpoint
+ * (in this case, duplicate intersections are often reported).</li>
+ * </ul>
+ *
+ * @author Initial algorithm implementation by taras
+ * @author Improvements and degeneracy handling by Michael Carleton
  */
 public class BalabanSolver {
 
@@ -27,17 +67,17 @@ public class BalabanSolver {
 	/**
 	 * Computes intersecting segment pairs for the given collection of line
 	 * segments.
-	 * 
+	 *
 	 * <p>
 	 * When a pair of intersecting segments is found, the callback provided during
 	 * construction is called.
-	 * 
+	 *
 	 * @param segments collection of segments
 	 */
 	public void computeIntersections(Collection<Segment> segments) {
 		endPoints = segmentsToEnds(segments);
-		final ArrayList<Segment> Lr = new ArrayList<Segment>();
-		final ArrayList<Segment> Ir = new ArrayList<Segment>();
+		final ArrayList<Segment> Lr = new ArrayList<>();
+		final ArrayList<Segment> Ir = new ArrayList<>();
 		Lr.add(endPoints[0].segment);
 		Ir.addAll(segments);
 		Ir.remove(endPoints[0].segment);
@@ -48,12 +88,12 @@ public class BalabanSolver {
 	private List<Segment> Rrrs;
 
 	private List<Segment> treeSearch(Collection<Segment> Lv, Collection<Segment> Iv, int b, int e) {
-		double bd = endPoints[b].x, ed = endPoints[e].x;
+		double bd = endPoints[b].point.x, ed = endPoints[e].point.x;
 		if (e - b == 1) { // 1
 			return searchInStrip(bd, ed, Lv);
 		}
-		List<Segment> Qv = new ArrayList<Segment>(), Lls = new ArrayList<Segment>(), Ils = new ArrayList<Segment>(),
-				Rls, Lrs, Irs = new ArrayList<Segment>(), Rrs;
+		List<Segment> Qv = new ArrayList<>(), Lls = new ArrayList<>(), Ils = new ArrayList<>(), Rls, Lrs, Irs = new ArrayList<>(),
+				Rrs;
 		split(bd, ed, Lv, Qv, Lls); // 2
 		int cnt = findIntersectionSorted(bd, ed, bd, Qv, Lls); // 3
 		findIntersectionUnsorted(bd, ed, Qv, Iv); // 10-11
@@ -63,7 +103,7 @@ public class BalabanSolver {
 			return merge(ed, s, Qv);
 		}
 		int c = (b + e) / 2; // 4
-		double cd = endPoints[c].x;
+		double cd = endPoints[c].point.x;
 		for (Segment segment : Iv) { // 5
 			if (segment.to.x < cd) {
 				Ils.add(segment);
@@ -97,8 +137,7 @@ public class BalabanSolver {
 	 * @param q  returned value. q is complete relative to l1
 	 * @param l1 returned value.
 	 */
-	private static void split(double b, double e, Collection<Segment> l, Collection<Segment> q,
-			Collection<Segment> l1) {
+	private static void split(double b, double e, Collection<Segment> l, Collection<Segment> q, Collection<Segment> l1) {
 		q.clear();
 		Segment lastQ = null;
 		l1.clear();
@@ -172,7 +211,10 @@ public class BalabanSolver {
 		int l = 0, h = staircase.size();
 		while (h != l) {
 			int c = (l + h) / 2;
-			if (seg.getY(x) < staircase.get(c).getY(x)) {
+			Segment stairSeg = staircase.get(c);
+			double ySeg = seg.getY(x);
+			double yStair = stairSeg.getY(x);
+			if (ySeg < yStair) {
 				h = c;
 			} else {
 				l = c + 1;
@@ -246,7 +288,7 @@ public class BalabanSolver {
 			return s1;
 		}
 
-		List<Segment> ret = new ArrayList<Segment>();
+		List<Segment> ret = new ArrayList<>();
 		Iterator<Segment> it1 = s1.iterator(), it2 = s2.iterator();
 		Segment seg1 = it1.next(), seg2 = it2.next();
 
@@ -293,7 +335,7 @@ public class BalabanSolver {
 	 * @return - r resulting right strip
 	 */
 	private List<Segment> searchInStrip(double b, double e, Collection<Segment> l) {
-		List<Segment> q = new ArrayList<Segment>(), l1 = new ArrayList<Segment>();
+		List<Segment> q = new ArrayList<>(), l1 = new ArrayList<>();
 		split(b, e, l, q, l1);
 		if (l1.isEmpty()) {
 			return q;
@@ -311,20 +353,20 @@ public class BalabanSolver {
 			ret[i++] = new EndPoint(segment, segment.from);
 			ret[i++] = new EndPoint(segment, segment.to);
 		}
-		Arrays.sort(ret);
+		Arrays.sort(ret); // Ensure endpoints are sorted
 		return ret;
 	}
 
 	/**
 	 * Identifies degenerate segments in the given segment collection, returning a
 	 * set of those identified. The input collection is not mutated.
-	 * 
+	 *
 	 * @param segments
 	 * @return a set of degenerate segments found in the input collection
 	 */
 	public Set<Segment> findDegenerateSegments(Collection<Segment> segments) {
 		Set<Double> seen = new HashSet<>();
-		Set<Segment> degenerate = new HashSet<Segment>();
+		Set<Segment> degenerate = new HashSet<>();
 
 		for (Segment segment : segments) {
 			if (Math.abs(segment.from.x - segment.to.x) < 0.00000000001) {
@@ -338,32 +380,50 @@ public class BalabanSolver {
 	}
 
 	private static class EndPoint implements Comparable<EndPoint> {
-
 		final Segment segment;
-		final double x;
+		final Point point;
 
 		EndPoint(Segment segment, Point endPoint) {
 			this.segment = segment;
-			this.x = endPoint.x;
+			this.point = endPoint;
 		}
 
-		/**
-		 * Does this endpoint represent the left-most point of the associated segment?
-		 * 
-		 * @return
-		 */
 		boolean isLeft() {
-			return x == segment.from.x;
+			if (segment.from.x < segment.to.x) {
+				return point.equals(segment.from);
+			} else if (segment.from.x > segment.to.x) {
+				return point.equals(segment.to);
+			} else {
+				// Vertical segment: left endpoint is the lower one
+				return (segment.from.y <= segment.to.y) ? point.equals(segment.from) : point.equals(segment.to);
+			}
 		}
 
 		@Override
 		public int compareTo(EndPoint o) {
-			if (x < o.x) {
+			// Compare by x first
+			if (this.point.x < o.point.x) {
 				return -1;
-			} else if (x == o.x) {
-				return 0;
-			} else {
+			}
+			if (this.point.x > o.point.x) {
 				return 1;
+			}
+
+			// Same x: left endpoints come before right endpoints
+			if (this.isLeft() && !o.isLeft()) {
+				return -1;
+			}
+			if (!this.isLeft() && o.isLeft()) {
+				return 1;
+			}
+
+			// Both left or both right, compare y
+			if (this.isLeft()) {
+				// Left endpoints: order by increasing y
+				return Double.compare(this.point.y, o.point.y);
+			} else {
+				// Right endpoints: order by decreasing y
+				return Double.compare(o.point.y, this.point.y);
 			}
 		}
 	}
